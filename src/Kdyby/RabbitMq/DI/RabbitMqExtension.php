@@ -314,8 +314,13 @@ class RabbitMqExtension extends \Nette\DI\CompilerExtension
 				);
 			}
 
+			// Producent nic neloguje. Autowirovaný logger by navíc zacyklil kontejner u projektů,
+			// jejichž logger posílá záznamy do RabbitMQ (logger -> handler -> producent -> logger).
 			$producer = $builder->addDefinition($serviceName = $this->prefix('producer.' . $name))
-				->setFactory($config['class'], ['@' . $this->connectionsMeta[$config['connection']]['serviceId']])
+				->setFactory($config['class'], [
+					'@' . $this->connectionsMeta[$config['connection']]['serviceId'],
+					'logger' => new Nette\DI\Definitions\Statement(\Psr\Log\NullLogger::class),
+				])
 				->setType(\Kdyby\RabbitMq\IProducer::class)
 				->addSetup('setContentType', [$config['contentType']])
 				->addSetup('setDeliveryMode', [$config['deliveryMode']])
