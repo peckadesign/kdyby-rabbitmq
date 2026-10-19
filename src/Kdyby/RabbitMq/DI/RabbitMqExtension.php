@@ -437,7 +437,13 @@ class RabbitMqExtension extends \Nette\DI\CompilerExtension
 					->addSetup('setCallback', [self::fixCallback($config['callback'])]);
 			}
 
-			$consumer->setArguments(['@' . $this->connectionsMeta[$config['connection']]['serviceId']]);
+			// Consumer nic neloguje, stejně jako producent. Ladicí záznamy z upstream dev-4 (tři na každou zprávu)
+			// by u projektů, jejichž logger posílá záznamy do RabbitMQ, krmily frontu logů: consumer této fronty
+			// by každou zpracovanou zprávou přidal do ní tři nové.
+			$consumer->setArguments([
+				'@' . $this->connectionsMeta[$config['connection']]['serviceId'],
+				'logger' => new Nette\DI\Definitions\Statement(\Psr\Log\NullLogger::class),
+			]);
 
 			if (\array_filter($config['qos'])) { // has values
 				$config['qos'] = $this->mergeConfig($config['qos'], $this->qosDefaults);
