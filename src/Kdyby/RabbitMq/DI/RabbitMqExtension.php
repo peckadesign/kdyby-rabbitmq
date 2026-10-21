@@ -314,8 +314,13 @@ class RabbitMqExtension extends \Nette\DI\CompilerExtension
 				);
 			}
 
+			// Producent nic neloguje. Autowirovaný logger by navíc zacyklil kontejner u projektů,
+			// jejichž logger posílá záznamy do RabbitMQ (logger -> handler -> producent -> logger).
 			$producer = $builder->addDefinition($serviceName = $this->prefix('producer.' . $name))
-				->setFactory($config['class'], ['@' . $this->connectionsMeta[$config['connection']]['serviceId']])
+				->setFactory($config['class'], [
+					'@' . $this->connectionsMeta[$config['connection']]['serviceId'],
+					'logger' => new Nette\DI\Definitions\Statement(\Psr\Log\NullLogger::class),
+				])
 				->setType(\Kdyby\RabbitMq\IProducer::class)
 				->addSetup('setContentType', [$config['contentType']])
 				->addSetup('setDeliveryMode', [$config['deliveryMode']])
@@ -432,7 +437,13 @@ class RabbitMqExtension extends \Nette\DI\CompilerExtension
 					->addSetup('setCallback', [self::fixCallback($config['callback'])]);
 			}
 
-			$consumer->setArguments(['@' . $this->connectionsMeta[$config['connection']]['serviceId']]);
+			// Consumer nic neloguje, stejně jako producent. Ladicí záznamy z upstream dev-4 (tři na každou zprávu)
+			// by u projektů, jejichž logger posílá záznamy do RabbitMQ, krmily frontu logů: consumer této fronty
+			// by každou zpracovanou zprávou přidal do ní tři nové.
+			$consumer->setArguments([
+				'@' . $this->connectionsMeta[$config['connection']]['serviceId'],
+				'logger' => new Nette\DI\Definitions\Statement(\Psr\Log\NullLogger::class),
+			]);
 
 			if (\array_filter($config['qos'])) { // has values
 				$config['qos'] = $this->mergeConfig($config['qos'], $this->qosDefaults);
